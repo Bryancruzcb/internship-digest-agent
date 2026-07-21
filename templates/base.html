@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Internship Digest Agent{% endblock %}</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📋</text></svg>">
+<style>
+  :root {
+    --ink: #1c1c1c; --muted: #6b6b6b; --faint: #e6e6e6;
+    --surface: #ffffff; --panel: #fafafa;
+    --series: #2a78d6;
+    --good: #0ca30c; --warning: #fab219; --critical: #d03b3b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--surface); color: var(--ink);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  main { max-width: 960px; margin: 0 auto; padding: 24px 20px 60px; }
+  header.site {
+    display: flex; align-items: baseline; gap: 14px;
+    border-bottom: 1px solid var(--faint); padding: 18px 20px;
+  }
+  header.site h1 { font-size: 17px; margin: 0; }
+  header.site a { color: var(--ink); text-decoration: none; }
+  header.site .sub { color: var(--muted); font-size: 13px; }
+  h2 { font-size: 15px; margin: 32px 0 12px; }
+  a { color: var(--series); }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th { text-align: left; color: var(--muted); font-weight: 500; font-size: 12px;
+       text-transform: uppercase; letter-spacing: 0.04em; }
+  th, td { padding: 8px 10px; border-bottom: 1px solid var(--faint); }
+  td.mono, a.mono { font-family: ui-monospace, Consolas, monospace; font-size: 13px; }
+  .muted { color: var(--muted); }
+  .empty { color: var(--muted); padding: 24px 0; }
+
+  /* Stat tiles */
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+           gap: 12px; margin-top: 20px; }
+  .tile { background: var(--panel); border: 1px solid var(--faint);
+          border-radius: 8px; padding: 14px 16px; }
+  .tile .num { font-size: 26px; font-weight: 600; }
+  .tile .lbl { font-size: 12px; color: var(--muted); text-transform: uppercase;
+               letter-spacing: 0.04em; }
+
+  /* Status badges: colored dot carries state, text carries meaning */
+  .badge { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+  .badge .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  .badge.completed .dot { background: var(--good); }
+  .badge.failed_retry .dot { background: var(--warning); }
+  .badge.failed .dot { background: var(--critical); }
+  .badge.running .dot, .badge.pending .dot { background: var(--series); }
+
+  /* Weekly bars */
+  .chart { display: flex; align-items: flex-end; gap: 2px; height: 120px;
+           border-bottom: 1px solid var(--faint); padding-top: 18px; }
+  .bar-col { display: flex; flex-direction: column; align-items: center;
+             justify-content: flex-end; flex: 0 1 48px; height: 100%; }
+  .bar { width: 100%; max-width: 40px; background: var(--series);
+         border-radius: 4px 4px 0 0; min-height: 2px; }
+  .bar-value { font-size: 12px; color: var(--ink); margin-bottom: 4px; }
+  .bar-label { font-size: 11px; color: var(--muted); margin-top: 6px; }
+  .chart-note { font-size: 12px; color: var(--muted); margin-top: 6px; }
+
+  /* Run Now */
+  .runbar { display: flex; align-items: center; gap: 12px; margin-top: 18px; }
+  button.primary {
+    background: var(--series); color: #fff; border: 0; border-radius: 6px;
+    padding: 8px 16px; font-size: 14px; cursor: pointer;
+  }
+  button.primary:disabled { opacity: 0.5; cursor: default; }
+
+  /* Rendered digest */
+  .prose { max-width: 760px; }
+  .prose h1 { font-size: 22px; }
+  .prose h2 { font-size: 16px; margin-top: 28px; }
+  .prose li { margin: 6px 0; }
+</style>
+</head>
+<body>
+<header class="site">
+  <h1><a href="{{ url_for('index') }}">Internship Digest Agent</a></h1>
+  <span class="sub">local dashboard</span>
+</header>
+<main>
+{% block content %}{% endblock %}
+</main>
+</body>
+</html>

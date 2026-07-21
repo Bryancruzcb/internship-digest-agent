@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Run {{ run.run_id[:8] }} — Internship Digest Agent{% endblock %}
+{% block content %}
+
+<h2>Run <span class="mono">{{ run.run_id }}</span></h2>
+<p>
+  <span class="badge {{ run.status }}"><span class="dot"></span>{{ run.status }}</span>
+  <span class="muted"> · created {{ run.created_at }} · step {{ run.current_step }}
+  · attempts {{ run.retry_count }}</span>
+</p>
+{% if run.last_error %}<p class="muted">Last error: {{ run.last_error }}</p>{% endif %}
+
+<h2>Step timeline</h2>
+{% if steps %}
+<table>
+  <tr><th>Time</th><th>Step</th><th>Status</th><th>Details</th></tr>
+  {% for s in steps %}
+  <tr>
+    <td class="muted">{{ s.timestamp }}</td>
+    <td>{{ s.step_name }}</td>
+    <td><span class="badge {{ 'completed' if s.status == 'success' else 'failed' }}">
+        <span class="dot"></span>{{ s.status }}</span></td>
+    <td class="muted">{{ s.details }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<p class="empty">No step logs recorded for this run.</p>
+{% endif %}
+
+{% endblock %}

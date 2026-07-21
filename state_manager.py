@@ -191,6 +191,54 @@ def has_active_run() -> bool:
     return count > 0
 
 
+def list_runs() -> list:
+    """All runs, newest first. Read-only; used by the dashboard."""
+    init_db()
+    conn = _connect()
+    rows = conn.execute(
+        "SELECT run_id, created_at, updated_at, status, current_step, retry_count, last_error "
+        "FROM agent_runs ORDER BY created_at DESC, rowid DESC"
+    ).fetchall()
+    conn.close()
+    keys = ("run_id", "created_at", "updated_at", "status", "current_step", "retry_count", "last_error")
+    return [dict(zip(keys, row)) for row in rows]
+
+
+def list_steps(run_id: str) -> list:
+    """Audit-trail entries for one run, oldest first. Read-only."""
+    init_db()
+    conn = _connect()
+    rows = conn.execute(
+        "SELECT step_name, timestamp, status, details FROM step_logs "
+        "WHERE run_id = ? ORDER BY timestamp, rowid",
+        (run_id,)
+    ).fetchall()
+    conn.close()
+    keys = ("step_name", "timestamp", "status", "details")
+    return [dict(zip(keys, row)) for row in rows]
+
+
+def weekly_seen_counts() -> list:
+    """New postings bucketed by ISO-style week, oldest first. Read-only."""
+    init_db()
+    conn = _connect()
+    rows = conn.execute(
+        "SELECT strftime('%Y-W%W', first_seen_at) AS week, COUNT(*) "
+        "FROM seen_postings GROUP BY week ORDER BY week"
+    ).fetchall()
+    conn.close()
+    return [{"week": row[0], "count": row[1]} for row in rows]
+
+
+def seen_count() -> int:
+    """Total postings ever published in a digest. Read-only."""
+    init_db()
+    conn = _connect()
+    count = conn.execute("SELECT COUNT(*) FROM seen_postings").fetchone()[0]
+    conn.close()
+    return count
+
+
 def filter_unseen(postings: list) -> list:
     """Returns only postings that have never appeared in a published digest."""
     init_db()

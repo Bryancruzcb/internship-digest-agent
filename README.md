@@ -1,5 +1,7 @@
 # Weekly Internship Digest Agent
 
+[![tests](https://github.com/Bryancruzcb/internship-digest-agent/actions/workflows/test.yml/badge.svg)](https://github.com/Bryancruzcb/internship-digest-agent/actions/workflows/test.yml)
+
 A scheduled agent that publishes a weekly digest of new software internship
 postings. Under the hood it is a small durable-execution engine: every pipeline
 step checkpoints its progress to SQLite, so if the process crashes mid-run, the
@@ -59,6 +61,20 @@ python scheduler.py    # daemon: runs weekly (Monday 09:00 by default)
 
 For a fast local demo, set `AGENT_INTERVAL_SECONDS=30` in `.env` and the
 daemon runs on that interval instead of weekly.
+
+## Dashboard
+
+```bash
+python dashboard.py    # http://127.0.0.1:5000
+```
+
+A local web view over the agent's SQLite state: stat tiles, new-postings-per-
+week bars, every run with its status and retry count, the per-run step audit
+trail, and the published digests rendered in the browser. The Run Now button
+triggers a run in the background — and if one is already active, the agent's
+own concurrency guard refuses the second one, which you can watch happen.
+
+![Dashboard](docs/dashboard.png)
 
 ## Testing
 
