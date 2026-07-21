@@ -1,0 +1,17 @@
+# Secrets
+.env
+
+# Runtime state and output
+agent_state.db
+*.db
+weekly_report.md
+reports/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Tooling
+.pytest_cache/
