@@ -11,7 +11,7 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 DEFAULT_MODEL_PROVIDER = os.getenv("AGENT_PROVIDER", "gemini").lower()
-DEFAULT_MODEL = os.getenv("AGENT_MODEL", "gemini-1.5-flash")
+DEFAULT_MODEL = os.getenv("AGENT_MODEL", "gemini-2.5-flash")
 
 # Schedule settings (e.g. cron string or interval in seconds)
 # For demo/test purposes, default to running every 60 seconds

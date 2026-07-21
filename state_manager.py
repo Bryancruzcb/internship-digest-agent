@@ -115,13 +115,17 @@ def log_step(run_id: str, step_name: str, status: str, details: str = ""):
     conn.close()
 
 def get_latest_incomplete_run() -> str:
-    """Finds the most recent run that did not finish (failed/pending/paused). Use for recovery."""
+    """Finds the most recent run that can still make progress (pending/running/failed_retry).
+
+    Terminally 'failed' runs are excluded on purpose: they already exhausted
+    their retries, so resuming them would retry forever and block new runs.
+    """
     init_db()
     conn = sqlite3.connect(config.DB_PATH)
     cursor = conn.cursor()
-    
+
     cursor.execute(
-        "SELECT run_id FROM agent_runs WHERE status NOT IN ('completed') ORDER BY timestamp DESC LIMIT 1"
+        "SELECT run_id FROM agent_runs WHERE status NOT IN ('completed', 'failed') ORDER BY timestamp DESC LIMIT 1"
     )
     row = cursor.fetchone()
     conn.close()
