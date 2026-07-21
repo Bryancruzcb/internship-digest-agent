@@ -23,7 +23,8 @@ AWS Step Functions provide.
    postings eligible for the next digest.
 
 The first run publishes a large catch-up digest (everything currently active);
-every run after that reports only what's new.
+every run after that reports only what's new. See a real (trimmed) example in
+[docs/sample-digest.md](docs/sample-digest.md).
 
 ## Reliability design
 
