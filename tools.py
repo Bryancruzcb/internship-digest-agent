@@ -1,45 +1,65 @@
 import logging
-import time
+from pathlib import Path
+
+import requests
 
 logger = logging.getLogger("StatefulAgent.Tools")
 
-def search_news(topic: str) -> list:
-    """Simulates a web search for the given topic."""
-    logger.info(f"Tool Search: Searching for updates on topic '{topic}'...")
-    time.sleep(1.5) # Simulate latency
-    
-    # Return mock results
-    return [
-        {
-            "title": f"New breakthroughs in {topic} announced this week.",
-            "source": "TechCrunch",
-            "summary": f"Experts detail key enhancements and future growth sectors in the space of {topic}."
-        },
-        {
-            "title": f"Why developers are migrating to modern {topic} architectures.",
-            "source": "InfoQ",
-            "summary": f"A comprehensive look at deployment pipelines and standard tools for developers working on {topic}."
-        }
-    ]
 
-def compile_report(articles: list, analysis: str) -> str:
-    """Formats the compiled articles and analysis into a markdown string."""
-    logger.info("Tool Compiler: Formatting markdown report...")
-    
-    report = f"# Weekly Digest: Tech Reports\n\n"
-    report += f"## Executive Summary\n{analysis}\n\n"
-    report += f"## Collected Articles\n"
-    
-    for a in articles:
-        report += f"- **{a['title']}** ({a['source']})\n  *{a['summary']}*\n"
-        
-    return report
+def fetch_postings(url: str, term: str) -> list:
+    """Downloads the SimplifyJobs listings feed and returns normalized postings
+    for the given term (e.g. 'Summer 2026')."""
+    logger.info(f"Fetching listings feed for term '{term}'...")
+    response = requests.get(url, timeout=30)
+    response.raise_for_status()
+    postings = normalize_postings(response.json(), term)
+    logger.info(f"Feed contains {len(postings)} active '{term}' postings.")
+    return postings
 
-def publish_report(report_content: str, filename: str = "weekly_report.md") -> str:
-    """Writes the compiled report to disk."""
-    logger.info(f"Tool Publisher: Writing report to {filename}...")
-    import config
-    output_path = config.BASE_DIR / filename
-    with open(output_path, "w", encoding="utf-8") as f:
-        f.write(report_content)
-    return str(output_path)
+
+def normalize_postings(raw: list, term: str) -> list:
+    """Reduces raw feed entries to the fields the digest needs, keeping only
+    active, visible postings for the requested term."""
+    postings = []
+    for entry in raw:
+        if not entry.get("active") or not entry.get("is_visible"):
+            continue
+        if term not in entry.get("terms", []):
+            continue
+        postings.append({
+            "id": entry["id"],
+            "company": entry.get("company_name", ""),
+            "title": entry.get("title", ""),
+            "locations": entry.get("locations", []),
+            "url": entry.get("url", ""),
+            "date_posted": entry.get("date_posted", 0),
+        })
+    return postings
+
+
+def compile_report(new_postings: list, summary: str, date_str: str) -> str:
+    """Formats the digest as markdown."""
+    lines = [f"# Internship Digest — {date_str}", "", "## Summary", "", summary, ""]
+
+    if new_postings:
+        lines.append(f"## New postings ({len(new_postings)})")
+        lines.append("")
+        for p in sorted(new_postings, key=lambda p: p["company"].lower()):
+            location = "; ".join(p["locations"]) if p["locations"] else "Location unlisted"
+            lines.append(f"- **{p['company']}** — [{p['title']}]({p['url']}) — {location}")
+    else:
+        lines.append("No new postings since the last digest.")
+
+    lines.append("")
+    return "\n".join(lines)
+
+
+def publish_report(content: str, reports_dir, date_str: str) -> Path:
+    """Writes the digest to a date-stamped file so past weeks are never
+    overwritten. Returns the path."""
+    reports_dir = Path(reports_dir)
+    reports_dir.mkdir(parents=True, exist_ok=True)
+    path = reports_dir / f"{date_str}-internship-digest.md"
+    path.write_text(content, encoding="utf-8")
+    logger.info(f"Report written to {path}")
+    return path

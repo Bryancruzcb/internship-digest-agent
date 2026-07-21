@@ -1,6 +1,5 @@
-import asyncio
-import sys
 import logging
+
 from agent import run_agent_loop
 
 # Clean logs for one-off CLI execution
@@ -10,12 +9,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger("StatefulAgent.CLI")
 
+
 def main():
-    logger.info("Executing one-off stateful agent run...")
-    if sys.platform == 'win32':
-        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-    asyncio.run(run_agent_loop())
-    logger.info("One-off run check completed.")
+    logger.info("Executing one-off agent run...")
+    run_agent_loop()
+    logger.info("One-off run finished.")
+
 
 if __name__ == "__main__":
     main()

@@ -1,8 +1,10 @@
-import time
 import logging
+from datetime import datetime
+
 from google import genai
 from google.genai import types
 from openai import OpenAI
+
 import config
 import state_manager
 import tools
@@ -10,13 +12,14 @@ import tools
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("StatefulAgent.Core")
 
-async def call_llm(prompt: str, system_instruction: str = None) -> str:
-    """Queries the LLM provider based on config settings."""
+
+def call_llm(prompt: str, system_instruction: str = None) -> str:
+    """Queries the configured LLM provider."""
     provider = config.DEFAULT_MODEL_PROVIDER
     model = config.DEFAULT_MODEL
-    
-    logger.info(f"Invoking LLM for analysis ({provider}:{model})...")
-    
+
+    logger.info(f"Invoking LLM ({provider}:{model})...")
+
     if provider == "gemini":
         if not config.GEMINI_API_KEY:
             raise ValueError("GEMINI_API_KEY is not set.")
@@ -30,7 +33,7 @@ async def call_llm(prompt: str, system_instruction: str = None) -> str:
             )
         )
         return response.text.strip()
-        
+
     elif provider in ("openai", "ollama"):
         if provider == "openai":
             if not config.OPENAI_API_KEY:
@@ -38,12 +41,12 @@ async def call_llm(prompt: str, system_instruction: str = None) -> str:
             client = OpenAI(api_key=config.OPENAI_API_KEY)
         else:
             client = OpenAI(base_url=config.OLLAMA_BASE_URL, api_key="ollama")
-            
+
         messages = []
         if system_instruction:
             messages.append({"role": "system", "content": system_instruction})
         messages.append({"role": "user", "content": prompt})
-        
+
         response = client.chat.completions.create(
             model=model,
             messages=messages,
@@ -53,140 +56,178 @@ async def call_llm(prompt: str, system_instruction: str = None) -> str:
     else:
         raise ValueError(f"Unknown provider: {provider}")
 
-async def run_step_research(state_data: dict) -> dict:
-    """Step 1: Gathers information using tools."""
-    topic = state_data.get("topic", "Agentic AI workflows")
-    articles = tools.search_news(topic)
-    state_data["articles"] = articles
+
+def _llm_configured() -> bool:
+    provider = config.DEFAULT_MODEL_PROVIDER
+    if provider == "gemini":
+        return bool(config.GEMINI_API_KEY)
+    if provider == "openai":
+        return bool(config.OPENAI_API_KEY)
+    return provider == "ollama"  # local, no key needed
+
+
+def run_step_fetch(state_data: dict) -> dict:
+    """Step 1: Downloads this term's active postings from the listings feed."""
+    state_data["postings"] = tools.fetch_postings(config.LISTINGS_URL, config.FILTER_TERM)
     return state_data
 
-async def run_step_analyze(state_data: dict) -> dict:
-    """Step 2: Uses LLM to analyze gathered data."""
-    articles = state_data.get("articles", [])
-    if not articles:
-        raise ValueError("No research articles found to analyze.")
-        
-    articles_str = json_str = ""
-    for idx, a in enumerate(articles):
-        articles_str += f"[{idx+1}] Title: {a['title']}\nSource: {a['source']}\nSummary: {a['summary']}\n\n"
-        
-    prompt = (
-        "Please read the following collected tech articles and write a 2-sentence executive summary "
-        "synthesizing the key takeaways and developer impact:\n\n"
-        f"{articles_str}"
+
+def run_step_filter(state_data: dict) -> dict:
+    """Step 2: Keeps only postings that have never been in a digest before."""
+    postings = state_data.pop("postings", [])
+    new_postings = state_manager.filter_unseen(postings)
+    logger.info(f"{len(new_postings)} new posting(s) out of {len(postings)} active.")
+    state_data["new_postings"] = new_postings
+    return state_data
+
+
+def run_step_summarize(state_data: dict) -> dict:
+    """Step 3: Asks the LLM for a short overview of what's new.
+
+    A missing API key is a configuration problem, not a transient failure, so
+    it degrades to a placeholder instead of burning the retry budget.
+    """
+    new_postings = state_data.get("new_postings", [])
+
+    if not new_postings:
+        state_data["summary"] = "No new postings since the last digest."
+        return state_data
+
+    if not _llm_configured():
+        logger.warning("No LLM API key configured; publishing digest without an LLM summary.")
+        state_data["summary"] = (
+            f"{len(new_postings)} new posting(s) this week. "
+            "(LLM summary disabled: no API key configured.)"
+        )
+        return state_data
+
+    listing_text = "\n".join(
+        f"- {p['company']}: {p['title']} ({'; '.join(p['locations']) or 'location unlisted'})"
+        for p in new_postings
     )
-    
-    system_instruction = "You are an expert AI industry analyst. Be direct, clear, and highly professional."
-    
-    analysis = await call_llm(prompt, system_instruction=system_instruction)
-    state_data["analysis"] = analysis
+    prompt = (
+        "These software internship postings appeared since last week's digest. "
+        "In 2-4 sentences, summarize what's new for a CS student applying to "
+        "internships: notable companies, clusters of roles, and locations.\n\n"
+        f"{listing_text}"
+    )
+    system_instruction = "You are a concise career-research assistant. Be direct and specific."
+
+    state_data["summary"] = call_llm(prompt, system_instruction=system_instruction)
     return state_data
 
-async def run_step_compile(state_data: dict) -> dict:
-    """Step 3: Formats markdown report."""
-    articles = state_data.get("articles", [])
-    analysis = state_data.get("analysis", "")
-    
-    report = tools.compile_report(articles, analysis)
-    state_data["report"] = report
+
+def run_step_publish(state_data: dict) -> dict:
+    """Step 4: Writes the date-stamped digest and records postings as seen.
+
+    Seen-marking happens only here — a run that failed before publishing keeps
+    its postings eligible for the next digest. Both the file write and the
+    marking are idempotent, so re-running after a crash is safe.
+    """
+    new_postings = state_data.get("new_postings", [])
+    date_str = datetime.now().strftime("%Y-%m-%d")
+    report_path = config.REPORTS_DIR / f"{date_str}-internship-digest.md"
+
+    if not new_postings and report_path.exists():
+        logger.info("Nothing new and today's digest already exists; keeping it.")
+    else:
+        report = tools.compile_report(new_postings, state_data.get("summary", ""), date_str)
+        tools.publish_report(report, config.REPORTS_DIR, date_str)
+
+    state_manager.mark_seen(new_postings)
+    state_data["report_path"] = str(report_path)
     return state_data
 
-async def run_step_publish(state_data: dict) -> dict:
-    """Step 4: Writes markdown file output."""
-    report = state_data.get("report", "")
-    if not report:
-        raise ValueError("No compiled report found to publish.")
-        
-    filepath = tools.publish_report(report)
-    state_data["filepath"] = filepath
-    return state_data
 
-# Map steps to their handler functions
 STEP_HANDLERS = {
-    "RESEARCH": run_step_research,
-    "ANALYZE": run_step_analyze,
-    "COMPILE": run_step_compile,
-    "PUBLISH": run_step_publish
+    "FETCH": run_step_fetch,
+    "FILTER": run_step_filter,
+    "SUMMARIZE": run_step_summarize,
+    "PUBLISH": run_step_publish,
 }
 
-STEP_ORDER = ["RESEARCH", "ANALYZE", "COMPILE", "PUBLISH"]
+STEP_ORDER = ["FETCH", "FILTER", "SUMMARIZE", "PUBLISH"]
 
-async def execute_run(run_id: str):
-    """Core state loop execution engine with persistence, error recovery, and retries."""
-    run = state_manager.load_run(run_id)
-    if not run:
-        logger.error(f"Run {run_id} not found in database.")
+MAX_ATTEMPTS = 3
+
+
+def execute_run(run_id: str):
+    """Core execution engine: claims the run, then executes steps from the
+    checkpoint with per-step retries and crash-safe persistence."""
+    if not state_manager.claim_run(run_id):
+        logger.info(f"Run {run_id} is owned by another process or terminal; skipping.")
         return
-        
-    logger.info(f"Executing run {run_id} (Status: {run['status']}, Current Step: {run['current_step']})")
-    
+
+    run = state_manager.load_run(run_id)
     state_data = run["state_data"]
-    # Ensure a topic is set
-    if "topic" not in state_data:
-        state_data["topic"] = "AI Agent Orchestration"
-        
     retry_count = run["retry_count"]
     current_step = run["current_step"]
-    
-    # Determine where we start
-    start_idx = 0
-    if current_step in STEP_ORDER:
-        start_idx = STEP_ORDER.index(current_step)
-        
-    # Set status to running
-    state_manager.update_run(run_id, "running", current_step, state_data, retry_count)
-    state_manager.log_step(run_id, "START", "success", f"Starting/Resuming execution from {current_step}")
-    
+
+    if current_step == "FINISHED":
+        # Crashed after the last step succeeded but before the completed write.
+        state_manager.update_run(run_id, "completed", "FINISHED", state_data, 0)
+        logger.info(f"Run {run_id} had already finished all steps; marked completed.")
+        return
+
+    start_idx = STEP_ORDER.index(current_step) if current_step in STEP_ORDER else 0
+    logger.info(f"Executing run {run_id} from step {STEP_ORDER[start_idx]} "
+                f"(attempt {retry_count + 1}/{MAX_ATTEMPTS})")
+    state_manager.log_step(run_id, "START", "success",
+                           f"Starting/Resuming execution from {STEP_ORDER[start_idx]}")
+
     for i in range(start_idx, len(STEP_ORDER)):
         step_name = STEP_ORDER[i]
         handler = STEP_HANDLERS[step_name]
-        
+
         logger.info(f"=== Running Step: {step_name} ===")
         state_manager.update_run(run_id, "running", step_name, state_data, retry_count)
-        
+
         try:
-            # Simulate processing and run step
-            state_data = await handler(state_data)
-            
-            # Step succeeded: Reset retry count and update checkpoint
-            retry_count = 0
-            state_manager.update_run(run_id, "running", step_name, state_data, retry_count)
-            state_manager.log_step(run_id, step_name, "success", f"Step {step_name} completed successfully.")
-            
+            state_data = handler(state_data)
         except Exception as e:
-            # Step failed: Increment retry count and log details
             retry_count += 1
             error_msg = str(e)
             logger.error(f"Error in step {step_name}: {error_msg}")
-            
-            # Record failure in logs
-            state_manager.log_step(run_id, step_name, "failed", f"Attempt {retry_count} failed: {error_msg}")
-            
-            if retry_count < 3:
-                # We can retry in the next scheduler cycle (checkpoint is saved)
-                logger.info(f"Retry threshold not met ({retry_count}/3). Pausing execution to retry next cycle.")
-                state_manager.update_run(run_id, "failed_retry", step_name, state_data, retry_count, error_msg)
-                return
+            state_manager.log_step(run_id, step_name, "failed",
+                                   f"Attempt {retry_count} failed: {error_msg}")
+
+            if retry_count < MAX_ATTEMPTS:
+                logger.info(f"Attempt {retry_count}/{MAX_ATTEMPTS} failed. "
+                            "Pausing execution to retry next cycle.")
+                state_manager.update_run(run_id, "failed_retry", step_name,
+                                         state_data, retry_count, error_msg)
             else:
-                # Maximum retries exceeded: Halt execution and notify/fail
-                logger.critical(f"Step {step_name} failed after {retry_count} attempts. Halting run.")
-                state_manager.update_run(run_id, "failed", step_name, state_data, retry_count, f"Max retries exceeded: {error_msg}")
-                return
-                
-    # Complete execution
+                logger.critical(f"Step {step_name} failed after {retry_count} attempts. "
+                                "Halting run; a fresh run will start next cycle.")
+                state_manager.update_run(run_id, "failed", step_name, state_data,
+                                         retry_count, f"Max attempts exceeded: {error_msg}")
+            return
+
+        # Success: checkpoint points at the NEXT step, so a crash after this
+        # write can never re-run the step that just finished.
+        retry_count = 0
+        next_step = STEP_ORDER[i + 1] if i + 1 < len(STEP_ORDER) else "FINISHED"
+        state_manager.update_run(run_id, "running", next_step, state_data, retry_count)
+        state_manager.log_step(run_id, step_name, "success",
+                               f"Step {step_name} completed successfully.")
+
     state_manager.update_run(run_id, "completed", "FINISHED", state_data, 0)
     state_manager.log_step(run_id, "FINISHED", "success", "Run completed successfully!")
     logger.info(f"=== Run {run_id} completed successfully! ===")
 
-async def run_agent_loop():
-    """Main daemon runner: resumes interrupted runs or starts a new one."""
-    incomplete_run_id = state_manager.get_latest_incomplete_run()
-    
-    if incomplete_run_id:
-        logger.info(f"Found incomplete run {incomplete_run_id}. Resuming...")
-        run_id = incomplete_run_id
+
+def run_agent_loop():
+    """Main entry: skips if a run is active elsewhere, resumes an interrupted
+    run if one exists, otherwise starts fresh."""
+    if state_manager.has_active_run():
+        logger.info("Another run is currently active; skipping this cycle.")
+        return
+
+    run_id = state_manager.get_resumable_run()
+    if run_id:
+        logger.info(f"Found resumable run {run_id}. Resuming...")
     else:
-        logger.info("No incomplete runs found. Starting fresh run...")
+        logger.info("No resumable runs found. Starting fresh run...")
         run_id = state_manager.create_run()
-        
-    await execute_run(run_id)
+
+    execute_run(run_id)
