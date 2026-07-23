@@ -71,6 +71,24 @@ def test_second_run_reports_nothing_new_and_keeps_existing_digest(tmp_path, monk
     assert seen_count == 1
 
 
+def test_same_day_second_run_with_new_postings_keeps_both_digests(tmp_path, monkeypatch):
+    """A second run on the same date that finds NEW postings must not clobber
+    the digest already written that day — every posting appears in exactly one
+    preserved digest, or it is lost forever (it is already marked seen)."""
+    _setup(tmp_path, monkeypatch, [POSTING])
+    agent.run_agent_loop()
+
+    second = dict(POSTING, id="p2", company="Beta Corp")
+    monkeypatch.setattr(tools, "fetch_postings", lambda url, terms: [POSTING, second])
+    agent.run_agent_loop()
+
+    reports = _reports(tmp_path)
+    assert len(reports) == 2, "second same-day run must write its own file"
+    combined = "".join(r.read_text(encoding="utf-8") for r in reports)
+    assert "Acme Robotics" in combined, "first digest's postings must survive"
+    assert "Beta Corp" in combined
+
+
 def test_failed_run_does_not_mark_postings_seen(tmp_path, monkeypatch):
     """Postings from a run that never published must stay eligible for the next
     digest — otherwise they silently vanish."""

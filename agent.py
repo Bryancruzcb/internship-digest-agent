@@ -133,8 +133,15 @@ def run_step_publish(state_data: dict) -> dict:
     if not new_postings and report_path.exists():
         logger.info("Nothing new and today's digest already exists; keeping it.")
     else:
-        report = tools.compile_report(new_postings, state_data.get("summary", ""), date_str)
-        tools.publish_report(report, config.REPORTS_DIR, date_str)
+        stamp = date_str
+        if report_path.exists():
+            # A digest already exists for today. Its postings are marked seen
+            # and appear nowhere else, so overwriting would lose them forever —
+            # the second batch gets its own time-stamped file instead.
+            stamp = datetime.now().strftime("%Y-%m-%d-%H%M")
+            report_path = config.REPORTS_DIR / f"{stamp}-internship-digest.md"
+        report = tools.compile_report(new_postings, state_data.get("summary", ""), stamp)
+        tools.publish_report(report, config.REPORTS_DIR, stamp)
 
     state_manager.mark_seen(new_postings)
     state_data["report_path"] = str(report_path)
