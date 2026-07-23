@@ -11,9 +11,13 @@ AWS Step Functions provide.
 
 ## What a run does
 
-1. **FETCH** — downloads the community-maintained
+1. **FETCH** — gathers postings from every configured source: the
+   community-maintained
    [SimplifyJobs internship feed](https://github.com/SimplifyJobs/Summer2026-Internships)
-   and keeps active postings for the configured term.
+   (the curated backbone), a per-company **ATS watchlist** polled directly
+   (same-day freshness), and optionally your **Handshake job-alert emails**.
+   Duplicate postings across sources are merged by company + title, with the
+   direct ATS link winning.
 2. **FILTER** — drops every posting that already appeared in a previous digest
    (tracked in a `seen_postings` table).
 3. **SUMMARIZE** — asks an LLM (Gemini, OpenAI, or local Ollama) for a short
@@ -103,14 +107,48 @@ normalization. No test touches the network.
 | `AGENT_MODEL` | `gemini-2.5-flash` | Model name for the provider |
 | `OLLAMA_BASE_URL` | `http://localhost:11434/v1` | Local Ollama endpoint |
 | `LISTINGS_URL` | SimplifyJobs Summer 2026 feed | Feed JSON to pull |
-| `FILTER_TERMS` | `Summer 2026,Fall 2026` | Comma-separated term tags to keep |
+| `FILTER_TERMS` | `Summer 2026,Fall 2026,Summer 2027` | Comma-separated term tags to keep |
+| `WATCHLIST_PATH` | `watchlist.json` | Company ATS watchlist file |
+| `HANDSHAKE_IMAP_USER` / `HANDSHAKE_IMAP_PASSWORD` | – | Enables Handshake alert-email parsing |
 | `SCHEDULE_DAY_OF_WEEK` / `SCHEDULE_HOUR` | `mon` / `9` | Weekly schedule |
 | `AGENT_INTERVAL_SECONDS` | – | Demo mode: run every N seconds |
 | `STALE_RUN_MINUTES` | `30` | Heartbeat age before a run counts as crashed |
 
-When SimplifyJobs publishes the Summer 2027 repo (usually around
-August–September), point `LISTINGS_URL` at it and set
-`FILTER_TERMS=Summer 2027`.
+The SimplifyJobs repo carries every season in one feed (Summer 2026, Fall
+2026, Summer 2027 and beyond as term tags), so rolling to a new cycle is just
+an edit to `FILTER_TERMS` — no repo switch needed.
+
+## Company watchlist
+
+`watchlist.json` lists companies whose ATS the agent polls directly — public
+JSON endpoints, no API keys. Supported: `greenhouse` (board token), `lever`
+(company token), `ashby` (org name), and `oracle_orc` (Oracle Recruiting
+Cloud host + site number — what UL Solutions uses, included as the default
+entry). Titles are filtered for intern/co-op roles; an optional
+`location_contains` filter keeps only matching locations. One company's
+endpoint failing is logged and skipped, never fatal.
+
+To add a company, find its apply-link domain in any digest: a
+`boards.greenhouse.io/<token>` link means `{"source": "greenhouse",
+"token": "<token>", "company": "..."}` — same idea for `jobs.lever.co` and
+`jobs.ashbyhq.com` URLs.
+
+## Connecting Handshake
+
+Handshake has no public API, and its terms of service prohibit scraping
+logged-in sessions — so this agent uses the one channel Handshake officially
+sends data through: **saved-search job alert emails** (each contains up to 25
+matching postings). Setup, one time:
+
+1. In Handshake, save a job search (e.g. software internships near you) and
+   enable email alerts for it.
+2. Create a [Gmail app password](https://myaccount.google.com/apppasswords)
+   and set `HANDSHAKE_IMAP_USER` / `HANDSHAKE_IMAP_PASSWORD` in `.env`.
+
+The agent then reads the last week's alert emails over IMAP (read-only) each
+run and folds those postings into the digest. Alternatively, some career
+centers publish a public Handshake "External Feed" RSS link — if yours does,
+that is worth asking for.
 
 ## Limitations
 

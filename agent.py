@@ -6,6 +6,7 @@ from google.genai import types
 from openai import OpenAI
 
 import config
+import sources
 import state_manager
 import tools
 
@@ -67,8 +68,9 @@ def _llm_configured() -> bool:
 
 
 def run_step_fetch(state_data: dict) -> dict:
-    """Step 1: Downloads this term's active postings from the listings feed."""
-    state_data["postings"] = tools.fetch_postings(config.LISTINGS_URL, config.FILTER_TERMS)
+    """Step 1: Gathers postings from every configured source — the SimplifyJobs
+    feed, the company ATS watchlist, and Handshake alert emails if enabled."""
+    state_data["postings"] = sources.fetch_all()
     return state_data
 
 

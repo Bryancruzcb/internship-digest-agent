@@ -23,9 +23,20 @@ LISTINGS_URL = os.getenv(
     "https://raw.githubusercontent.com/SimplifyJobs/Summer2026-Internships/dev/.github/scripts/listings.json",
 )
 # Comma-separated term tags to keep. FILTER_TERM (singular) is honored for
-# backward compatibility.
-_terms = os.getenv("FILTER_TERMS") or os.getenv("FILTER_TERM") or "Summer 2026,Fall 2026"
+# backward compatibility. The one SimplifyJobs repo carries all seasons, so
+# rolling to a new cycle is just an edit here — no repo switch needed.
+_terms = (os.getenv("FILTER_TERMS") or os.getenv("FILTER_TERM")
+          or "Summer 2026,Fall 2026,Summer 2027")
 FILTER_TERMS = [t.strip() for t in _terms.split(",") if t.strip()]
+
+# Company watchlist: per-company ATS endpoints polled directly (see sources.py).
+WATCHLIST_PATH = Path(os.getenv("WATCHLIST_PATH", BASE_DIR / "watchlist.json"))
+
+# Handshake saved-search alert emails via IMAP (disabled until both are set).
+HANDSHAKE_IMAP_USER = os.getenv("HANDSHAKE_IMAP_USER")
+HANDSHAKE_IMAP_PASSWORD = os.getenv("HANDSHAKE_IMAP_PASSWORD")
+HANDSHAKE_IMAP_HOST = os.getenv("HANDSHAKE_IMAP_HOST", "imap.gmail.com")
+HANDSHAKE_IMAP_FOLDER = os.getenv("HANDSHAKE_IMAP_FOLDER", "INBOX")
 
 # Weekly schedule. Setting AGENT_INTERVAL_SECONDS switches to a fast interval
 # for demos and local testing.

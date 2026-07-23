@@ -21,7 +21,10 @@ def _setup(tmp_path, monkeypatch, postings):
     # No LLM key: SUMMARIZE must degrade to a placeholder, not fail the run.
     monkeypatch.setattr(config, "DEFAULT_MODEL_PROVIDER", "gemini")
     monkeypatch.setattr(config, "GEMINI_API_KEY", None)
-    monkeypatch.setattr(tools, "fetch_postings", lambda url, term: list(postings))
+    # Keep tests off the network: no watchlist file, Handshake disabled.
+    monkeypatch.setattr(config, "WATCHLIST_PATH", tmp_path / "no-watchlist.json")
+    monkeypatch.setattr(config, "HANDSHAKE_IMAP_USER", None)
+    monkeypatch.setattr(tools, "fetch_postings", lambda url, terms: list(postings))
 
 
 def _reports(tmp_path):
