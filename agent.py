@@ -68,7 +68,7 @@ def _llm_configured() -> bool:
 
 def run_step_fetch(state_data: dict) -> dict:
     """Step 1: Downloads this term's active postings from the listings feed."""
-    state_data["postings"] = tools.fetch_postings(config.LISTINGS_URL, config.FILTER_TERM)
+    state_data["postings"] = tools.fetch_postings(config.LISTINGS_URL, config.FILTER_TERMS)
     return state_data
 
 

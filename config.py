@@ -22,7 +22,10 @@ LISTINGS_URL = os.getenv(
     "LISTINGS_URL",
     "https://raw.githubusercontent.com/SimplifyJobs/Summer2026-Internships/dev/.github/scripts/listings.json",
 )
-FILTER_TERM = os.getenv("FILTER_TERM", "Summer 2026")
+# Comma-separated term tags to keep. FILTER_TERM (singular) is honored for
+# backward compatibility.
+_terms = os.getenv("FILTER_TERMS") or os.getenv("FILTER_TERM") or "Summer 2026,Fall 2026"
+FILTER_TERMS = [t.strip() for t in _terms.split(",") if t.strip()]
 
 # Weekly schedule. Setting AGENT_INTERVAL_SECONDS switches to a fast interval
 # for demos and local testing.

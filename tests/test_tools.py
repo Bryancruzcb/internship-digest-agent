@@ -38,7 +38,7 @@ RAW = [
 
 
 def test_normalize_keeps_only_active_visible_matching_term():
-    result = tools.normalize_postings(RAW, "Summer 2026")
+    result = tools.normalize_postings(RAW, ["Summer 2026"])
 
     assert [p["id"] for p in result] == ["keep-1"]
     p = result[0]
@@ -48,8 +48,15 @@ def test_normalize_keeps_only_active_visible_matching_term():
     assert p["locations"] == ["San Jose, CA"]
 
 
+def test_normalize_accepts_multiple_terms():
+    result = tools.normalize_postings(RAW, ["Summer 2026", "Fall 2026"])
+
+    assert [p["id"] for p in result] == ["keep-1", "drop-wrong-term"], (
+        "a posting matching ANY configured term must be kept")
+
+
 def test_compile_report_lists_postings_and_summary():
-    postings = tools.normalize_postings(RAW, "Summer 2026")
+    postings = tools.normalize_postings(RAW, ["Summer 2026"])
     report = tools.compile_report(postings, "One new robotics internship.", "2026-07-20")
 
     assert "2026-07-20" in report

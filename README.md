@@ -103,14 +103,14 @@ normalization. No test touches the network.
 | `AGENT_MODEL` | `gemini-2.5-flash` | Model name for the provider |
 | `OLLAMA_BASE_URL` | `http://localhost:11434/v1` | Local Ollama endpoint |
 | `LISTINGS_URL` | SimplifyJobs Summer 2026 feed | Feed JSON to pull |
-| `FILTER_TERM` | `Summer 2026` | Term tag to keep |
+| `FILTER_TERMS` | `Summer 2026,Fall 2026` | Comma-separated term tags to keep |
 | `SCHEDULE_DAY_OF_WEEK` / `SCHEDULE_HOUR` | `mon` / `9` | Weekly schedule |
 | `AGENT_INTERVAL_SECONDS` | – | Demo mode: run every N seconds |
 | `STALE_RUN_MINUTES` | `30` | Heartbeat age before a run counts as crashed |
 
 When SimplifyJobs publishes the Summer 2027 repo (usually around
 August–September), point `LISTINGS_URL` at it and set
-`FILTER_TERM=Summer 2027`.
+`FILTER_TERMS=Summer 2027`.
 
 ## Limitations
 

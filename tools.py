@@ -6,25 +6,26 @@ import requests
 logger = logging.getLogger("StatefulAgent.Tools")
 
 
-def fetch_postings(url: str, term: str) -> list:
+def fetch_postings(url: str, terms: list) -> list:
     """Downloads the SimplifyJobs listings feed and returns normalized postings
-    for the given term (e.g. 'Summer 2026')."""
-    logger.info(f"Fetching listings feed for term '{term}'...")
+    matching any of the given terms (e.g. ['Summer 2026', 'Fall 2026'])."""
+    logger.info(f"Fetching listings feed for terms {terms}...")
     response = requests.get(url, timeout=30)
     response.raise_for_status()
-    postings = normalize_postings(response.json(), term)
-    logger.info(f"Feed contains {len(postings)} active '{term}' postings.")
+    postings = normalize_postings(response.json(), terms)
+    logger.info(f"Feed contains {len(postings)} active postings for {terms}.")
     return postings
 
 
-def normalize_postings(raw: list, term: str) -> list:
+def normalize_postings(raw: list, terms: list) -> list:
     """Reduces raw feed entries to the fields the digest needs, keeping only
-    active, visible postings for the requested term."""
+    active, visible postings tagged with at least one requested term."""
+    wanted = set(terms)
     postings = []
     for entry in raw:
         if not entry.get("active") or not entry.get("is_visible"):
             continue
-        if term not in entry.get("terms", []):
+        if wanted.isdisjoint(entry.get("terms", [])):
             continue
         postings.append({
             "id": entry["id"],
