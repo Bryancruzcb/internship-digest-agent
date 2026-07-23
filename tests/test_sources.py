@@ -143,25 +143,53 @@ def test_fetch_all_merges_and_dedupes_by_company_title(tmp_path, monkeypatch):
 
 # --- handshake alert-email parsing (fixture; no network, no credentials) ---
 
-ALERT_HTML = """
+# Condensed from a real Handshake job-match alert (2026-07): links are
+# tracking-wrapped, and job data lives in job-list-* spans.
+REAL_ALERT_HTML = """
 <html><body>
-  <p>New jobs matching your saved search:</p>
+<a class="job-list-logo-link" href="https://email.notifications.joinhandshake.com/c/AAAA">
+  <img alt="Google, Inc. logo"></a>
+<a class="job-list-content-link" href="https://email.notifications.joinhandshake.com/c/BBBB">
+  <span class="job-list-employer">Google, Inc.</span>
+  <span class="job-list-title">Software Engineering Intern, MS, Summer 2027</span>
+  <span class="job-list-meta">$98&#8211;131K/yr &#8226; Internship &#8226; Bellevue, WA +29 (Onsite)</span>
+</a>
+<a href="https://email.notifications.joinhandshake.com/u/unsubscribe">unsubscribe</a>
+</body></html>
+"""
+
+LEGACY_ALERT_HTML = """
+<html><body>
   <a href="https://app.joinhandshake.com/jobs/8912345?ref=email">Software Engineering Intern</a>
-  at <b>UL Solutions</b>
-  <a href="https://app.joinhandshake.com/jobs/8912399?ref=email">Marketing Coordinator</a>
-  at <b>SomeCo</b>
   <a href="https://app.joinhandshake.com/settings">Unsubscribe</a>
 </body></html>
 """
 
 
-def test_handshake_alert_parser_extracts_job_links():
-    result = sources.parse_handshake_alert(ALERT_HTML)
+def test_handshake_parser_reads_real_alert_format():
+    result = sources.parse_handshake_alert(REAL_ALERT_HTML)
 
-    ids = [p["id"] for p in result]
-    assert "hs:8912345" in ids, "job links must be extracted"
-    assert all(not p["url"].endswith("/settings") for p in result), \
-        "non-job links must be ignored"
-    intern = next(p for p in result if p["id"] == "hs:8912345")
-    assert intern["title"] == "Software Engineering Intern"
-    assert intern["url"].startswith("https://app.joinhandshake.com/jobs/8912345")
+    assert len(result) == 1, "one job item; logo/unsubscribe links ignored"
+    job = result[0]
+    assert job["company"] == "Google, Inc."
+    assert job["title"] == "Software Engineering Intern, MS, Summer 2027"
+    assert job["locations"] == ["Bellevue, WA +29 (Onsite)"]
+    assert job["url"] == "https://email.notifications.joinhandshake.com/c/BBBB"
+    assert job["id"].startswith("hs:")
+
+
+def test_handshake_parser_id_is_stable_across_emails():
+    """Tracking URLs differ per email; the id must not — else the same job
+    reappears in every digest."""
+    a = sources.parse_handshake_alert(REAL_ALERT_HTML)[0]
+    b = sources.parse_handshake_alert(
+        REAL_ALERT_HTML.replace("/c/BBBB", "/c/DIFFERENT-TOKEN"))[0]
+
+    assert a["id"] == b["id"]
+
+
+def test_handshake_parser_still_reads_direct_job_links():
+    result = sources.parse_handshake_alert(LEGACY_ALERT_HTML)
+
+    assert [p["title"] for p in result] == ["Software Engineering Intern"]
+    assert result[0]["url"].startswith("https://app.joinhandshake.com/jobs/8912345")

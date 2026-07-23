@@ -174,17 +174,64 @@ def fetch_watchlist() -> list:
     return postings
 
 
-HS_LINK_RE = re.compile(
+# Modern alert emails wrap every link in a per-email tracking URL, so job ids
+# aren't visible; job data lives in job-list-* spans inside the content link.
+HS_ITEM_RE = re.compile(
+    r'<a\b([^>]*job-list-content-link[^>]*)>(.*?)</a>', re.IGNORECASE | re.DOTALL)
+HS_HREF_RE = re.compile(r'href="([^"]+)"', re.IGNORECASE)
+HS_SPAN_RES = {
+    "employer": re.compile(r'class="[^"]*job-list-employer[^"]*"[^>]*>(.*?)</span>',
+                           re.IGNORECASE | re.DOTALL),
+    "title": re.compile(r'class="[^"]*job-list-title[^"]*"[^>]*>(.*?)</span>',
+                        re.IGNORECASE | re.DOTALL),
+    "meta": re.compile(r'class="[^"]*job-list-meta[^"]*"[^>]*>(.*?)</span>',
+                       re.IGNORECASE | re.DOTALL),
+}
+# Older/simpler notification formats link straight to the posting.
+HS_DIRECT_RE = re.compile(
     r'<a[^>]+href="(https://app\.joinhandshake\.com/jobs/(\d+)[^"]*)"[^>]*>(.*?)</a>',
     re.IGNORECASE | re.DOTALL)
 
 
+def _clean(fragment: str) -> str:
+    import html as html_mod
+    return html_mod.unescape(re.sub(r"<[^>]+>", "", fragment)).strip()
+
+
 def parse_handshake_alert(html: str) -> list:
-    """Extracts job postings from a Handshake saved-search alert email."""
+    """Extracts job postings from a Handshake alert email (job-match alerts,
+    weekly round-ups, and saved-search notifications)."""
+    import hashlib
     out = []
-    for match in HS_LINK_RE.finditer(html):
+
+    for match in HS_ITEM_RE.finditer(html):
+        attrs, body = match.groups()
+        employer_m = HS_SPAN_RES["employer"].search(body)
+        title_m = HS_SPAN_RES["title"].search(body)
+        if not (employer_m and title_m):
+            continue
+        employer, title = _clean(employer_m.group(1)), _clean(title_m.group(1))
+        meta_m = HS_SPAN_RES["meta"].search(body)
+        location = ""
+        if meta_m:
+            parts = [p.strip() for p in _clean(meta_m.group(1)).split("•")]
+            if len(parts) >= 2:
+                location = parts[-1]
+        href_m = HS_HREF_RE.search(attrs)
+        # Tracking URLs change per email — a content hash keeps the id stable.
+        digest = hashlib.sha1(f"{employer}|{title}".encode()).hexdigest()[:16]
+        out.append({
+            "id": f"hs:{digest}",
+            "company": employer,
+            "title": title,
+            "locations": [location] if location else [],
+            "url": href_m.group(1) if href_m else "",
+            "date_posted": 0,
+        })
+
+    for match in HS_DIRECT_RE.finditer(html):
         url, job_id, raw_title = match.groups()
-        title = re.sub(r"<[^>]+>", "", raw_title).strip()
+        title = _clean(raw_title)
         if not title:
             continue
         out.append({
@@ -195,7 +242,15 @@ def parse_handshake_alert(html: str) -> list:
             "url": url,
             "date_posted": 0,
         })
-    return out
+
+    seen_ids = set()
+    unique = []
+    for p in out:
+        if p["id"] in seen_ids:
+            continue
+        seen_ids.add(p["id"])
+        unique.append(p)
+    return unique
 
 
 def fetch_handshake_alerts() -> list:
