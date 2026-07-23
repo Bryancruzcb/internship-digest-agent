@@ -68,11 +68,17 @@ daemon runs on that interval instead of weekly.
 python dashboard.py    # http://127.0.0.1:5000
 ```
 
-A local web view over the agent's SQLite state: stat tiles, new-postings-per-
-week bars, every run with its status and retry count, the per-run step audit
-trail, and the published digests rendered in the browser. The Run Now button
-triggers a run in the background — and if one is already active, the agent's
-own concurrency guard refuses the second one, which you can watch happen.
+A local web view over the agent's SQLite state: hit-counter stats, new-
+postings-per-week bars, every run with its status and retry count, the per-run
+step audit trail, and the published digests rendered in the browser. The Run
+Now button triggers a run in the background — and if one is already active,
+the agent's own concurrency guard refuses the second one, which you can watch
+happen.
+
+The dashboard deliberately wears a Windows 95 aesthetic — beveled buttons,
+title bars, green phosphor counters. The agent is a small system utility, so
+it dresses like one. (Zero external assets: one inline stylesheet, no
+webfonts, no JavaScript frameworks.)
 
 ![Dashboard](docs/dashboard.png)
 

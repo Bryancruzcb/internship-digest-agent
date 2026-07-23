@@ -1,62 +1,77 @@
 {% extends "base.html" %}
 {% block content %}
 
-<div class="tiles">
-  <div class="tile"><div class="num">{{ stats.total_runs }}</div><div class="lbl">Runs</div></div>
-  <div class="tile"><div class="num">{{ stats.completed }}</div><div class="lbl">Completed</div></div>
-  <div class="tile"><div class="num">{{ stats.postings }}</div><div class="lbl">Postings tracked</div></div>
-  <div class="tile"><div class="num">{{ stats.digests }}</div><div class="lbl">Digests published</div></div>
-</div>
-
-<div class="runbar">
-  <form method="post" action="{{ url_for('run_now') }}">
-    <button class="primary" type="submit" {% if active %}disabled{% endif %}>Run Now</button>
-  </form>
-  {% if active %}<span class="muted">A run is in progress — refresh to update.</span>{% endif %}
+<div class="window bevel-out">
+  <div class="titlebar"><h2>AGENT_STATUS.EXE</h2><span class="winbtns" aria-hidden="true">_ □ X</span></div>
+  <div class="content">
+    <div class="counters">
+      <div class="counter bevel-in"><div class="num">{{ '%07d'|format(stats.total_runs) }}</div><div class="lbl">Runs</div></div>
+      <div class="counter bevel-in"><div class="num">{{ '%07d'|format(stats.completed) }}</div><div class="lbl">Completed</div></div>
+      <div class="counter bevel-in"><div class="num">{{ '%07d'|format(stats.postings) }}</div><div class="lbl">Postings tracked</div></div>
+      <div class="counter bevel-in"><div class="num">{{ '%07d'|format(stats.digests) }}</div><div class="lbl">Digests published</div></div>
+    </div>
+    <hr class="groove">
+    <form method="post" action="{{ url_for('run_now') }}" style="display:inline">
+      <button class="primary" type="submit" {% if active %}disabled{% endif %}>Run Now</button>
+    </form>
+    {% if active %}<b> ⏳ A RUN IS IN PROGRESS — hit refresh to update!</b>{% endif %}
+  </div>
 </div>
 
 {% if weekly %}
-<h2>New postings per week</h2>
-<div class="chart" aria-label="New postings per week">
-  {% for w in weekly %}
-  <div class="bar-col" title="{{ w.week }}: {{ w.count }} postings">
-    {% if w.count == max_count or loop.last %}<span class="bar-value">{{ w.count }}</span>{% endif %}
-    <div class="bar" style="height: {{ ((w.count / max_count * 96) if max_count else 2) | round | int }}px"></div>
-    <span class="bar-label">{{ w.week[5:] }}</span>
+<div class="window bevel-out">
+  <div class="titlebar"><h2>WEEKLY_CHART.EXE — new postings per week</h2><span class="winbtns" aria-hidden="true">_ □ X</span></div>
+  <div class="content">
+    <div class="chart bevel-in" aria-label="New postings per week">
+      {% for w in weekly %}
+      <div class="bar-col" title="{{ w.week }}: {{ w.count }} postings">
+        {% if w.count == max_count or loop.last %}<span class="bar-value">{{ w.count }}</span>{% endif %}
+        <div class="bar" style="height: {{ ((w.count / max_count * 92) if max_count else 4) | round | int }}px"></div>
+        <span class="bar-label">{{ w.week[5:] }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    <p class="chart-note">&gt;&gt; hover a bar for the exact count. weeks = calendar week of first appearance.</p>
   </div>
-  {% endfor %}
 </div>
-<p class="chart-note">Hover a bar for the exact count. Weeks are calendar weeks of first appearance.</p>
 {% endif %}
 
-<h2>Runs</h2>
-{% if runs %}
-<table>
-  <tr><th>Run</th><th>Created</th><th>Status</th><th>Step</th><th>Attempts</th><th>Last error</th></tr>
-  {% for r in runs %}
-  <tr>
-    <td><a class="mono" href="{{ url_for('run_detail', run_id=r.run_id) }}">{{ r.run_id[:8] }}</a></td>
-    <td class="muted">{{ r.created_at }}</td>
-    <td><span class="badge {{ r.status }}"><span class="dot"></span>{{ r.status }}</span></td>
-    <td>{{ r.current_step }}</td>
-    <td>{{ r.retry_count }}</td>
-    <td class="muted" title="{{ r.last_error }}">{{ r.last_error[:60] }}</td>
-  </tr>
-  {% endfor %}
-</table>
-{% else %}
-<p class="empty">No runs yet — click Run Now to publish your first digest.</p>
-{% endif %}
+<div class="window bevel-out">
+  <div class="titlebar"><h2>RUN_HISTORY.DB</h2><span class="winbtns" aria-hidden="true">_ □ X</span></div>
+  <div class="content white bevel-in">
+  {% if runs %}
+  <table>
+    <tr><th>Run</th><th>Created</th><th>Status</th><th>Step</th><th>Attempts</th><th>Last error</th></tr>
+    {% for r in runs %}
+    <tr>
+      <td><a class="mono" href="{{ url_for('run_detail', run_id=r.run_id) }}">{{ r.run_id[:8] }}</a></td>
+      <td>{{ r.created_at }}</td>
+      <td><span class="badge {{ r.status }}"><span class="dot"></span>{{ r.status }}</span></td>
+      <td class="mono">{{ r.current_step }}</td>
+      <td class="mono">{{ r.retry_count }}</td>
+      <td title="{{ r.last_error }}">{{ r.last_error[:60] }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="empty"><b>No runs yet!</b> Click Run Now to publish your first digest.</p>
+  {% endif %}
+  </div>
+</div>
 
-<h2>Digests</h2>
-{% if reports %}
-<ul>
-  {% for name in reports %}
-  <li><a href="{{ url_for('report', name=name) }}">{{ name }}</a></li>
-  {% endfor %}
-</ul>
-{% else %}
-<p class="empty">No digests published yet.</p>
-{% endif %}
+<div class="window bevel-out">
+  <div class="titlebar"><h2>DIGESTS</h2><span class="winbtns" aria-hidden="true">_ □ X</span></div>
+  <div class="content notepad bevel-in">
+  {% if reports %}
+  <ul>
+    {% for name in reports %}
+    <li>💾 <a href="{{ url_for('report', name=name) }}">{{ name }}</a>{% if loop.first %}<span class="newbadge">NEW!</span>{% endif %}</li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="empty"><b>No digests published yet.</b></p>
+  {% endif %}
+  </div>
+</div>
 
 {% endblock %}

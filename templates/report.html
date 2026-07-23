@@ -1,7 +1,12 @@
 {% extends "base.html" %}
 {% block title %}{{ name }} — Internship Digest Agent{% endblock %}
 {% block content %}
-<div class="prose">
+<div class="window bevel-out">
+  <div class="titlebar"><h2>{{ name|upper }}</h2><span class="winbtns" aria-hidden="true">_ □ X</span></div>
+  <div class="content notepad bevel-in">
+    <div class="prose">
 {{ body | safe }}
+    </div>
+  </div>
 </div>
 {% endblock %}

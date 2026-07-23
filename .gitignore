@@ -15,3 +15,6 @@ venv/
 
 # Tooling
 .pytest_cache/
+
+# Local design tooling context
+.superdesign/

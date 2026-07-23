@@ -2,30 +2,40 @@
 {% block title %}Run {{ run.run_id[:8] }} — Internship Digest Agent{% endblock %}
 {% block content %}
 
-<h2>Run <span class="mono">{{ run.run_id }}</span></h2>
-<p>
-  <span class="badge {{ run.status }}"><span class="dot"></span>{{ run.status }}</span>
-  <span class="muted"> · created {{ run.created_at }} · step {{ run.current_step }}
-  · attempts {{ run.retry_count }}</span>
-</p>
-{% if run.last_error %}<p class="muted">Last error: {{ run.last_error }}</p>{% endif %}
+<div class="window bevel-out">
+  <div class="titlebar"><h2>RUN_{{ run.run_id[:8] }}.LOG</h2><span class="winbtns" aria-hidden="true">_ □ X</span></div>
+  <div class="content">
+    <p>
+      <span class="badge {{ run.status }}"><span class="dot"></span>{{ run.status }}</span>
+      &nbsp;·&nbsp; created <b class="mono">{{ run.created_at }}</b>
+      &nbsp;·&nbsp; step <b class="mono">{{ run.current_step }}</b>
+      &nbsp;·&nbsp; attempts <b class="mono">{{ run.retry_count }}</b>
+    </p>
+    <p class="mono muted" style="font-size:12px">run_id: {{ run.run_id }}</p>
+    {% if run.last_error %}<p><b>Last error:</b> {{ run.last_error }}</p>{% endif %}
+  </div>
+</div>
 
-<h2>Step timeline</h2>
-{% if steps %}
-<table>
-  <tr><th>Time</th><th>Step</th><th>Status</th><th>Details</th></tr>
-  {% for s in steps %}
-  <tr>
-    <td class="muted">{{ s.timestamp }}</td>
-    <td>{{ s.step_name }}</td>
-    <td><span class="badge {{ 'completed' if s.status == 'success' else 'failed' }}">
-        <span class="dot"></span>{{ s.status }}</span></td>
-    <td class="muted">{{ s.details }}</td>
-  </tr>
-  {% endfor %}
-</table>
-{% else %}
-<p class="empty">No step logs recorded for this run.</p>
-{% endif %}
+<div class="window bevel-out">
+  <div class="titlebar"><h2>STEP_TIMELINE</h2><span class="winbtns" aria-hidden="true">_ □ X</span></div>
+  <div class="content white bevel-in">
+  {% if steps %}
+  <table>
+    <tr><th>Time</th><th>Step</th><th>Status</th><th>Details</th></tr>
+    {% for s in steps %}
+    <tr>
+      <td>{{ s.timestamp }}</td>
+      <td class="mono">{{ s.step_name }}</td>
+      <td><span class="badge {{ 'completed' if s.status == 'success' else 'failed' }}">
+          <span class="dot"></span>{{ s.status }}</span></td>
+      <td>{{ s.details }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="empty"><b>No step logs recorded for this run.</b></p>
+  {% endif %}
+  </div>
+</div>
 
 {% endblock %}
