@@ -104,7 +104,7 @@ normalization. No test touches the network.
 |---|---|---|
 | `GEMINI_API_KEY` / `OPENAI_API_KEY` | – | Enables LLM summaries |
 | `AGENT_PROVIDER` | `gemini` | `gemini`, `openai`, or `ollama` |
-| `AGENT_MODEL` | `gemini-2.5-flash` | Model name for the provider |
+| `AGENT_MODEL` | `gemini-flash-lite-latest` | Model id; the `-latest` alias auto-tracks Google's current model |
 | `OLLAMA_BASE_URL` | `http://localhost:11434/v1` | Local Ollama endpoint |
 | `LISTINGS_URL` | SimplifyJobs Summer 2026 feed | Feed JSON to pull |
 | `FILTER_TERMS` | `Summer 2026,Fall 2026,Summer 2027` | Comma-separated term tags to keep |

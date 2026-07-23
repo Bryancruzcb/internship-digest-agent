@@ -13,7 +13,10 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
 
 DEFAULT_MODEL_PROVIDER = os.getenv("AGENT_PROVIDER", "gemini").lower()
-DEFAULT_MODEL = os.getenv("AGENT_MODEL", "gemini-2.5-flash")
+# The -latest alias tracks whatever Google's current flash-lite model is, so
+# the default can never rot into a retired model id (the original scaffold
+# shipped with exactly that bug).
+DEFAULT_MODEL = os.getenv("AGENT_MODEL", "gemini-flash-lite-latest")
 
 # Community-maintained internship feed (SimplifyJobs). A new repo is created
 # each season — point LISTINGS_URL and FILTER_TERM at Summer2027-Internships
